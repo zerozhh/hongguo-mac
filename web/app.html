@@ -1,0 +1,837 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hongguo</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --pink: #ff2e5f;
+    --pink-soft: #ffe9f0;
+    --pink-border: #ffc9d8;
+    --bg: #f5f6f8;
+    --line: #eceef1;
+    --txt: #1f2129;
+    --txt2: #6b7080;
+  }
+  html, body { height: 100%; }
+  body {
+    font-family: -apple-system, "PingFang SC", "Helvetica Neue", sans-serif;
+    background: var(--bg); color: var(--txt); font-size: 14px;
+    -webkit-font-smoothing: antialiased;
+  }
+  button { font-family: inherit; }
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-thumb { background: #d6d8de; border-radius: 4px; }
+
+  /* ===== 侧边栏 ===== */
+  .side {
+    position: fixed; left: 0; top: 0; bottom: 0; width: 72px; z-index: 20;
+    background: #fff; border-right: 1px solid #f0f1f3;
+    display: flex; flex-direction: column; align-items: center; padding: 16px 0 18px;
+  }
+  .logo {
+    width: 36px; height: 36px; border-radius: 11px; margin-bottom: 22px;
+    background: linear-gradient(135deg, #ff5f6d, #ff2e5f);
+    display: grid; place-items: center; cursor: pointer;
+  }
+  .nav {
+    width: 100%; padding: 11px 0; display: flex; flex-direction: column;
+    align-items: center; gap: 4px; color: #5a5f6e; cursor: pointer; font-size: 11px;
+    user-select: none;
+  }
+  .nav svg { width: 22px; height: 22px; }
+  .nav.on { color: var(--pink); font-weight: 600; }
+  .nav:hover { color: var(--pink); }
+  .side .spacer { flex: 1; }
+
+  /* ===== 主区 ===== */
+  .main { margin-left: 72px; min-height: 100vh; display: flex; flex-direction: column; }
+  .top {
+    position: sticky; top: 0; z-index: 10; background: #fff;
+    display: flex; align-items: center; gap: 26px; height: 60px; padding: 0 26px;
+  }
+  .brand { font-size: 19px; font-weight: 800; color: var(--pink); letter-spacing: .5px; white-space: nowrap; }
+  .gtabs { display: flex; gap: 24px; }
+  .gtab { font-size: 15px; color: #333; padding: 19px 2px 17px; cursor: pointer; border-bottom: 2.5px solid transparent; }
+  .gtab.on { color: var(--pink); font-weight: 700; border-color: var(--pink); }
+  .searchbox {
+    margin-left: auto; display: flex; align-items: center; gap: 8px;
+    background: #f2f3f5; border-radius: 10px; padding: 8px 14px; width: 300px;
+  }
+  .searchbox input { flex: 1; border: 0; outline: 0; background: transparent; font-size: 13px; color: var(--txt); }
+  .searchbox svg { width: 17px; height: 17px; color: #8a8f9c; cursor: pointer; }
+
+  .view { flex: 1; padding: 18px 26px 70px; max-width: 1460px; width: 100%; margin: 0 auto; }
+
+  /* ===== 通用组件 ===== */
+  .chips { display: flex; flex-wrap: wrap; gap: 10px; margin: 4px 0 22px; }
+  .chip {
+    padding: 5px 15px; border-radius: 8px; background: #fff; border: 1px solid var(--line);
+    font-size: 13px; color: #333; cursor: pointer; transition: .12s;
+  }
+  .chip:hover { border-color: var(--pink-border); color: var(--pink); }
+  .chip.on { background: var(--pink-soft); color: var(--pink); border-color: var(--pink-border); font-weight: 600; }
+
+  .sechead { display: flex; align-items: center; margin: 26px 0 16px; }
+  .sechead:first-child { margin-top: 2px; }
+  .sechead h2 { font-size: 20px; font-weight: 800; }
+  .sechead .sub { margin-left: 14px; display: flex; gap: 10px; }
+  .sechead .acts { margin-left: auto; display: flex; gap: 10px; }
+  .ghost {
+    background: #fff; border: 1px solid var(--line); border-radius: 8px;
+    padding: 6px 14px; font-size: 13px; color: #333; cursor: pointer;
+  }
+  .ghost:hover { border-color: var(--pink-border); color: var(--pink); }
+  .pill-tab {
+    padding: 5px 14px; border-radius: 999px; background: #fff; border: 1px solid var(--line);
+    font-size: 13px; cursor: pointer; color: #444;
+  }
+  .pill-tab.on { color: var(--pink); border-color: var(--pink); background: var(--pink-soft); font-weight: 600; }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 20px 14px; }
+
+  .card { cursor: pointer; }
+  .poster {
+    position: relative; aspect-ratio: 7/10; border-radius: 9px; overflow: hidden;
+    background: linear-gradient(160deg, #e8e9ee, #d9dbe2);
+  }
+  .poster img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform .25s; }
+  .card:hover .poster img { transform: scale(1.04); }
+  .rk {
+    position: absolute; top: 5px; left: 9px; font-size: 20px; font-weight: 800; font-style: italic;
+    color: #fff; text-shadow: 0 1px 5px rgba(0,0,0,.55); z-index: 2;
+  }
+  .rk.top3 { font-size: 26px; }
+  .pill {
+    position: absolute; z-index: 2; background: rgba(0,0,0,.55); color: #fff;
+    font-size: 11px; padding: 2.5px 8px; border-radius: 999px; backdrop-filter: blur(2px);
+  }
+  .pill.eps { top: 7px; right: 7px; }
+  .pill.heat { bottom: 7px; left: 7px; }
+  .playov {
+    position: absolute; inset: 0; z-index: 3; display: grid; place-items: center;
+    background: rgba(0,0,0,.12); opacity: 0; transition: .16s;
+  }
+  .card:hover .playov { opacity: 1; }
+  .playov .cir {
+    width: 46px; height: 46px; border-radius: 50%; background: var(--pink);
+    display: grid; place-items: center; box-shadow: 0 4px 14px rgba(255,46,95,.45);
+  }
+  .crow { display: flex; align-items: flex-start; gap: 6px; margin-top: 9px; }
+  .ctitle {
+    flex: 1; font-size: 13px; font-weight: 500; line-height: 1.45; color: var(--txt);
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  }
+  .favbtn { border: 0; background: none; cursor: pointer; color: #b6bac4; padding: 2px; flex: none; }
+  .favbtn.on { color: var(--pink); }
+  .favbtn:hover { color: var(--pink); }
+  .ctags { margin-top: 4px; font-size: 12px; color: #9298a5; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  .empty { text-align: center; padding: 90px 0; color: #9298a5; }
+  .empty .big { font-size: 44px; margin-bottom: 12px; }
+  .loadbox { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 80px 0; color: var(--txt2); }
+  .spin {
+    width: 22px; height: 22px; border: 3px solid #e5e6eb; border-top-color: var(--pink);
+    border-radius: 50%; animation: rot 0.8s linear infinite;
+  }
+  @keyframes rot { to { transform: rotate(360deg); } }
+
+  /* ===== 详情页 ===== */
+  .hero { display: flex; gap: 26px; background: #fff; border-radius: 14px; padding: 24px; }
+  .hero .hposter { width: 212px; flex: none; aspect-ratio: 7/10; border-radius: 10px; object-fit: cover; background: #e8e9ee; }
+  .hinfo { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .hinfo h1 { font-size: 23px; font-weight: 800; }
+  .hmeta { display: flex; flex-wrap: wrap; gap: 7px 0; margin-top: 10px; font-size: 13px; color: var(--txt2); }
+  .hmeta b { color: var(--pink); font-weight: 700; }
+  .hmeta .sep { margin: 0 10px; color: #d8dae0; }
+  .hintro { margin-top: 14px; font-size: 13.5px; color: #4c5162; line-height: 1.75; }
+  .hintro.clamp { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .hintro .more { color: var(--pink); cursor: pointer; white-space: nowrap; }
+  .hbtns { margin-top: auto; padding-top: 18px; display: flex; gap: 12px; }
+  .btn-pink {
+    display: inline-flex; align-items: center; gap: 7px; background: var(--pink); color: #fff;
+    border: 0; border-radius: 10px; padding: 10px 24px; font-size: 14px; font-weight: 600; cursor: pointer;
+  }
+  .btn-pink:hover { filter: brightness(1.06); }
+  .btn-line {
+    display: inline-flex; align-items: center; gap: 7px; background: #fff; color: #333;
+    border: 1px solid var(--line); border-radius: 10px; padding: 10px 18px; font-size: 14px; cursor: pointer;
+  }
+  .btn-line.on { color: var(--pink); border-color: var(--pink-border); background: var(--pink-soft); }
+
+  .epswrap { background: #fff; border-radius: 14px; padding: 20px 24px 24px; margin-top: 16px; }
+  .epswrap h3 { font-size: 16px; font-weight: 700; margin-bottom: 14px; }
+  .eps { display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); gap: 10px; }
+  .ep {
+    height: 38px; border-radius: 9px; background: #f6f7f9; border: 1px solid transparent;
+    display: grid; place-items: center; font-size: 13px; cursor: pointer; color: #333;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 6px;
+  }
+  .ep:hover { border-color: var(--pink-border); color: var(--pink); }
+  .ep.seen { color: #a7acb9; }
+  .ep.cur { background: var(--pink-soft); color: var(--pink); border-color: var(--pink-border); font-weight: 700; }
+
+  /* ===== 播放页 ===== */
+  .watch { display: flex; gap: 0; height: calc(100vh - 60px); background: #000; }
+  .stage { flex: 1; position: relative; display: flex; align-items: center; justify-content: center; min-width: 0; }
+  .stage video { width: 100%; height: 100%; object-fit: contain; background: #000; }
+  .vload {
+    position: absolute; inset: 0; display: flex; flex-direction: column; gap: 14px;
+    align-items: center; justify-content: center; color: #fff; background: rgba(0,0,0,.5); z-index: 6;
+  }
+  .vload .tip { font-size: 13px; color: #d8dae0; }
+  .ctrl {
+    position: absolute; left: 0; right: 0; bottom: 0; z-index: 7; padding: 30px 18px 12px;
+    background: linear-gradient(transparent, rgba(0,0,0,.72)); transition: opacity .2s;
+  }
+  .stage.hidecursor .ctrl { opacity: 0; }
+  .pbar { height: 4px; background: rgba(255,255,255,.25); border-radius: 2px; cursor: pointer; position: relative; }
+  .pbar:hover { height: 6px; }
+  .pbar .cur { position: absolute; left: 0; top: 0; bottom: 0; background: var(--pink); border-radius: 2px; }
+  .pbar .dot {
+    position: absolute; top: 50%; width: 12px; height: 12px; border-radius: 50%;
+    background: #fff; transform: translate(-50%,-50%); box-shadow: 0 1px 4px rgba(0,0,0,.4);
+  }
+  .crow2 { display: flex; align-items: center; gap: 14px; margin-top: 10px; color: #fff; }
+  .cbtn { background: none; border: 0; color: #fff; cursor: pointer; display: grid; place-items: center; padding: 4px; border-radius: 6px; }
+  .cbtn:hover { background: rgba(255,255,255,.14); }
+  .cbtn svg { width: 21px; height: 21px; }
+  .tm { font-size: 12px; color: #d8dae0; font-variant-numeric: tabular-nums; }
+  .cspace { flex: 1; }
+  .spd, .autoc {
+    font-size: 12.5px; color: #fff; background: rgba(255,255,255,.14); border: 0;
+    padding: 4px 10px; border-radius: 6px; cursor: pointer;
+  }
+  .autoc.on { background: var(--pink); }
+  .speedmenu {
+    position: absolute; right: 0; bottom: 40px; background: rgba(20,20,24,.92); border-radius: 10px;
+    padding: 6px; display: none; flex-direction: column; z-index: 9;
+  }
+  .speedmenu.show { display: flex; }
+  .speedmenu div { color: #fff; font-size: 13px; padding: 7px 22px; border-radius: 7px; cursor: pointer; text-align: center; }
+  .speedmenu div:hover { background: rgba(255,255,255,.12); }
+  .speedmenu div.on { color: var(--pink); font-weight: 700; }
+  .epdrawer {
+    width: 292px; flex: none; background: #fff; display: flex; flex-direction: column;
+    border-left: 1px solid #eee;
+  }
+  .epdrawer.hidden { display: none; }
+  .epdrawer .dh { padding: 14px 16px 10px; font-size: 14px; font-weight: 700; border-bottom: 1px solid #f2f3f5; }
+  .epdrawer .dlist { flex: 1; overflow-y: auto; padding: 8px; }
+  .ditem { display: flex; gap: 8px; padding: 8px; border-radius: 9px; cursor: pointer; align-items: center; }
+  .ditem:hover { background: #f6f7f9; }
+  .ditem.cur { background: var(--pink-soft); }
+  .ditem .no { width: 20px; text-align: center; color: #9298a5; font-size: 12px; flex: none; }
+  .ditem.cur .no { color: var(--pink); font-weight: 700; }
+  .ditem .dt { flex: 1; font-size: 12.5px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .wtop {
+    position: absolute; top: 0; left: 0; right: 0; z-index: 7; padding: 14px 16px;
+    background: linear-gradient(rgba(0,0,0,.6), transparent); color: #fff;
+    display: flex; align-items: center; gap: 12px; transition: opacity .2s;
+  }
+  .stage.hidecursor .wtop { opacity: 0; }
+  .wtop .back { background: none; border: 0; color: #fff; cursor: pointer; display: grid; place-items: center; }
+  .wtop .wt { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  /* ===== 历史/收藏列表 ===== */
+  .hrow {
+    display: flex; gap: 14px; background: #fff; border-radius: 12px; padding: 12px; margin-bottom: 12px;
+    align-items: center; cursor: pointer;
+  }
+  .hrow:hover { box-shadow: 0 2px 10px rgba(0,0,0,.05); }
+  .hthumb { width: 86px; aspect-ratio: 7/10; border-radius: 8px; object-fit: cover; flex: none; background: #e8e9ee; }
+  .hinfo2 { flex: 1; min-width: 0; }
+  .hinfo2 .t { font-size: 15px; font-weight: 600; }
+  .hinfo2 .m { font-size: 12.5px; color: var(--txt2); margin-top: 5px; }
+  .hbar { margin-top: 9px; height: 4px; background: #eef0f3; border-radius: 2px; max-width: 320px; }
+  .hbar i { display: block; height: 100%; background: var(--pink); border-radius: 2px; }
+  .hacts { display: flex; gap: 8px; flex: none; }
+
+  /* ===== 设置 ===== */
+  .setbox { background: #fff; border-radius: 14px; padding: 22px 26px; margin-bottom: 16px; }
+  .setbox h3 { font-size: 15px; font-weight: 700; margin-bottom: 14px; }
+  .kv { display: flex; justify-content: space-between; padding: 7px 0; font-size: 13.5px; }
+  .kv .k { color: var(--txt2); }
+  .oktag { color: #0aa870; font-weight: 600; }
+  .note { font-size: 12.5px; color: #9298a5; line-height: 1.8; }
+
+  #toast {
+    position: fixed; left: 50%; bottom: 46px; transform: translateX(-50%) translateY(20px);
+    background: rgba(25,27,34,.92); color: #fff; padding: 10px 22px; border-radius: 10px;
+    font-size: 13.5px; opacity: 0; transition: .25s; z-index: 99; pointer-events: none; max-width: 70vw;
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+
+<aside class="side">
+  <div class="logo" onclick="go('#/discover')" title="红果短剧">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="#fff"><path d="M8 5.5v13c0 .8.9 1.3 1.6.9l10.2-6.5c.6-.4.6-1.4 0-1.8L9.6 4.6c-.7-.4-1.6.1-1.6.9z"/></svg>
+  </div>
+  <div class="nav" data-nav="discover" onclick="go('#/discover')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M12 3l2.2 5.3 5.8.5-4.4 3.8 1.3 5.7L12 15.3 7.1 18.3l1.3-5.7L4 8.8l5.8-.5z"/></svg>
+    发现
+  </div>
+  <div class="nav" data-nav="rank" onclick="go('#/rank')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4h10v4a5 5 0 01-10 0V4z"/><path d="M7 5H4.5a0 0 0 000 0c0 3 1.5 4.5 3 4.5M17 5h2.5c0 3-1.5 4.5-3 4.5M12 13v4M9 20h6M10 17h4"/></svg>
+    排行榜
+  </div>
+  <div class="nav" data-nav="fav" onclick="go('#/fav')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M6 4h12v17l-6-4.2L6 21V4z"/></svg>
+    收藏
+  </div>
+  <div class="nav" data-nav="history" onclick="go('#/history')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3.2 2"/></svg>
+    历史
+  </div>
+  <div class="spacer"></div>
+  <div class="nav" data-nav="settings" onclick="go('#/settings')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M19 12a7 7 0 00-.14-1.4l2-1.55-2-3.46-2.35.95a7 7 0 00-2.42-1.4L13.73 2h-3.46l-.36 2.54a7 7 0 00-2.42 1.4l-2.35-.95-2 3.46 2 1.55A7 7 0 005 12c0 .48.05.94.14 1.4l-2 1.55 2 3.46 2.35-.95a7 7 0 002.42 1.4l.36 2.54h3.46l.36-2.54a7 7 0 002.42-1.4l2.35.95 2-3.46-2-1.55c.09-.46.14-.92.14-1.4z"/></svg>
+    设置
+  </div>
+</aside>
+
+<main class="main">
+  <header class="top">
+    <div class="brand" onclick="go('#/discover')">HONGGUO</div>
+    <div class="gtabs" id="gtabs"></div>
+    <div class="searchbox">
+      <input id="q" placeholder="搜索短剧或演员" onkeydown="if(event.key==='Enter')doSearch()">
+      <svg onclick="doSearch()" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+    </div>
+  </header>
+  <div class="view" id="view"></div>
+</main>
+
+<div id="toast"></div>
+
+<script>
+'use strict';
+/* ================= 基础 ================= */
+const $ = s => document.querySelector(s);
+const GENRES = [
+  { id: 'short_play', name: '真人剧' },
+  { id: 'comic_series', name: '漫剧' },
+  { id: 'ai_series', name: 'AI剧' },
+];
+const PINK = '#ff2e5f';
+let curGenre = localStorage.getItem('hg_genre') || 'comic_series';
+const imgx = u => '/img?url=' + encodeURIComponent(u || '');
+const fmtW = n => !n ? '' : n >= 1e8 ? (n / 1e8).toFixed(1) + '亿' : n >= 1e4 ? Math.round(n / 1e4) + '万' : String(n);
+const fmtT = s => { s = Math.max(0, Math.floor(s||0)); const m = Math.floor(s/60); return m + ':' + String(s%60).padStart(2,'0'); };
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+// category 字段不同接口类型不一: browse 是 "a / b / c" 字符串, episodes 是数组 → 统一转"·"分隔展示
+const catStr = v => typeof v === 'string' ? v : Array.isArray(v) ? v.filter(x => typeof x === 'string').join('/') : '';
+const catDots = (v, n=3) => catStr(v).split('/').map(s => s.trim()).filter(Boolean).slice(0, n).join(' · ');
+
+async function api(path) {
+  const ctl = new AbortController();
+  const t = setTimeout(() => ctl.abort(), 30000);
+  try {
+    const r = await fetch(path, { signal: ctl.signal });
+    if (!r.ok) { let d = ''; try { d = (await r.json()).detail || ''; } catch(e){} throw new Error(d || ('HTTP ' + r.status)); }
+    return await r.json();
+  } finally { clearTimeout(t); }
+}
+// 全局兜底: 未捕获的异步错误显示在页面上(避免静默卡在加载态)
+window.addEventListener('unhandledrejection', ev => {
+  const e = ev.reason || {};
+  const el = $('#view');
+  if (el) el.innerHTML = `<div class="empty"><div class="big">⚠️</div>${esc(e.message || String(e))}
+    <br><br><button class="ghost" onclick="location.reload()">重新加载</button></div>`;
+});
+function toast(msg, ms=2200) {
+  const t = $('#toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('show'), ms);
+}
+function go(hash) { if (location.hash === hash) route(); else location.hash = hash; }
+function doSearch() {
+  const v = $('#q').value.trim();
+  if (v) go('#/search/' + encodeURIComponent(v));
+}
+
+/* ================= 收藏 / 历史 ================= */
+const favs = {
+  all: () => JSON.parse(localStorage.getItem('hg_favs') || '[]'),
+  has: sid => favs.all().some(x => x.sid === sid),
+  toggle: item => {
+    let a = favs.all(); const sid = item.sid;
+    if (a.some(x => x.sid === sid)) { a = a.filter(x => x.sid !== sid); }
+    else a.unshift({ ...item, ts: Date.now() });
+    localStorage.setItem('hg_favs', JSON.stringify(a));
+    return a.some(x => x.sid === sid);
+  },
+};
+const hist = {
+  all: () => (JSON.parse(localStorage.getItem('hg_hist') || '[]')).sort((a,b) => b.ts - a.ts),
+  get: sid => hist.all().find(x => x.sid === sid),
+  put(rec) {
+    let a = JSON.parse(localStorage.getItem('hg_hist') || '[]');
+    a = a.filter(x => x.sid !== rec.sid);
+    a.unshift({ ...rec, ts: Date.now() });
+    if (a.length > 200) a = a.slice(0, 200);
+    localStorage.setItem('hg_hist', JSON.stringify(a));
+  },
+  remove(sid) { let a = hist.all(); a = a.filter(x => x.sid !== sid); localStorage.setItem('hg_hist', JSON.stringify(a)); },
+  clear() { localStorage.setItem('hg_hist', '[]'); },
+};
+const cache = { filters: {}, eps: {} };
+
+/* ================= 卡片 ================= */
+function cardHTML(it, opt = {}) {
+  const cat = catDots(it.category);
+  const isFav = favs.has(it.series_id);
+  const heat = it.hot || (it.play_cnt ? fmtW(it.play_cnt) + '热度' : '');
+  return `
+  <div class="card" onclick="go('#/detail/${it.series_id}')">
+    <div class="poster">
+      ${opt.rank ? `<div class="rk ${opt.rank<=3?'top3':''}">${opt.rank}</div>` : ''}
+      ${it.episode_cnt ? `<div class="pill eps">全 ${it.episode_cnt} 集</div>` : ''}
+      ${heat ? `<div class="pill heat">${esc(heat)}</div>` : ''}
+      <img loading="lazy" src="${imgx(it.cover)}" onerror="this.style.visibility='hidden'">
+      <div class="playov"><div class="cir">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="#fff"><path d="M8 5.5v13c0 .8.9 1.3 1.6.9l10.2-6.5c.6-.4.6-1.4 0-1.8L9.6 4.6c-.7-.4-1.6.1-1.6.9z"/></svg>
+      </div></div>
+    </div>
+    <div class="crow">
+      <div class="ctitle">${esc(it.title)}</div>
+      <button class="favbtn ${isFav?'on':''}" title="收藏" onclick="event.stopPropagation();toggleFav('${it.series_id}',this)">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="${isFav?PINK:'none'}" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M6 4h12v17l-6-4.2L6 21V4z"/></svg>
+      </button>
+    </div>
+    <div class="ctags">${esc(cat || (it.score ? '评分 ' + it.score : ''))}</div>
+  </div>`;
+}
+function toggleFav(sid, btn) {
+  const on = favs.toggle({ sid, title: btn.closest('.card').querySelector('.ctitle').textContent,
+                           cover: btn.closest('.card').querySelector('img')?.src || '', ts: 0 });
+  btn.classList.toggle('on', on);
+  btn.querySelector('svg').setAttribute('fill', on ? PINK : 'none');
+  toast(on ? '已加入收藏' : '已取消收藏');
+}
+function gridHTML(items, opt = {}) {
+  if (!items || !items.length) return `<div class="empty"><div class="big">🎬</div>暂无内容</div>`;
+  return `<div class="grid">${items.map((it, i) => cardHTML(it, { ...opt, rank: opt.ranked ? i + 1 : null })).join('')}</div>`;
+}
+const loadingHTML = '<div class="loadbox"><div class="spin"></div>加载中…</div>';
+
+/* ================= 视图: 发现 ================= */
+async function vDiscover(view) {
+  const el = $('#view');
+  renderGtabs();
+  el.innerHTML = loadingHTML;
+  let filters = null;
+  try { filters = await api('/filters?genre=' + curGenre); } catch (e) {}
+  cache.filters[curGenre] = filters;
+  const themes = (filters?.rows || []).find(r => r.type === 'category_dim_theme')?.items || [];
+  el.innerHTML = `
+    <div class="chips" id="chips">
+      <div class="chip on" data-t="">全部</div>
+      ${themes.map(t => `<div class="chip" data-t="${esc(t.name)}">${esc(t.name)}</div>`).join('')}
+    </div>
+    <div id="dcontent">${loadingHTML}</div>`;
+  $('#chips').addEventListener('click', e => {
+    const c = e.target.closest('.chip'); if (!c) return;
+    document.querySelectorAll('#chips .chip').forEach(x => x.classList.remove('on'));
+    c.classList.add('on');
+    loadDiscover(c.dataset.t);
+  });
+  loadDiscover('');
+}
+
+async function loadDiscover(theme) {
+  const box = $('#dcontent'); if (!box) return;
+  box.innerHTML = loadingHTML;
+  const g = curGenre;
+  try {
+    if (theme) {
+      const d = await api(`/browse?genre=${g}&theme=${encodeURIComponent(theme)}&limit=36`);
+      box.innerHTML = `<div class="sechead"><h2>${esc(theme)}</h2></div>` + gridHTML(d.items);
+      return;
+    }
+    // 正在热播: 漫剧用真实热榜; 其他体裁取排序含"热"的 browse
+    let hot = [];
+    if (g === 'comic_series') {
+      hot = (await api('/rank?board=hot&limit=12')).items;
+    } else {
+      const f = cache.filters[g] || await api('/filters?genre=' + g);
+      const sorts = (f.rows || []).find(r => r.type === 'sort')?.items || [];
+      const hotSort = sorts.find(s => (s.name || '').includes('热'));
+      const p = new URLSearchParams({ genre: g, limit: '12' });
+      if (hotSort) p.set('sort', hotSort.name);
+      hot = (await api('/browse?' + p)).items;
+    }
+    const fresh = (await api(`/latest?genre=${g}&only_today=false&limit=12`)).items;
+    box.innerHTML = `
+      <div class="sechead">
+        <h2>正在热播</h2>
+        <div class="acts"><button class="ghost" onclick="go('#/rank')">查看完整榜单</button></div>
+      </div>
+      ${gridHTML(hot, { ranked: true })}
+      <div class="sechead"><h2>新剧</h2>
+        <div class="acts"><button class="ghost" onclick="loadDiscover('')">刷新片单</button></div>
+      </div>
+      ${gridHTML(fresh)}`;
+  } catch (e) {
+    box.innerHTML = `<div class="empty"><div class="big">⚠️</div>${esc(e.message)}<br><br>
+      <button class="ghost" onclick="loadDiscover('')">重试</button></div>`;
+  }
+}
+
+/* ================= 视图: 排行榜 ================= */
+async function vRank() {
+  renderGtabs(true);
+  const el = $('#view');
+  el.innerHTML = `
+    <div class="chips" id="rktabs">
+      <div class="chip on" data-b="recommend">推荐榜</div>
+      <div class="chip" data-b="hot">热播榜</div>
+      <div class="chip" data-b="new">新品榜</div>
+    </div>
+    <div class="note" style="margin-bottom:14px">漫剧榜单 · 数据来自内容服务</div>
+    <div id="rkbox">${loadingHTML}</div>`;
+  $('#rktabs').addEventListener('click', e => {
+    const c = e.target.closest('.chip'); if (!c) return;
+    document.querySelectorAll('#rktabs .chip').forEach(x => x.classList.remove('on'));
+    c.classList.add('on');
+    loadRank(c.dataset.b);
+  });
+  loadRank('recommend');
+}
+async function loadRank(board) {
+  const box = $('#rkbox'); box.innerHTML = loadingHTML;
+  try {
+    const d = await api('/rank?board=' + board + '&limit=30');
+    box.innerHTML = gridHTML(d.items, { ranked: true });
+  } catch (e) { box.innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
+}
+
+/* ================= 视图: 搜索 ================= */
+async function vSearch(q) {
+  renderGtabs(true);
+  $('#q').value = q;
+  const el = $('#view');
+  el.innerHTML = `<div class="sechead"><h2>“${esc(q)}” 的搜索结果</h2></div><div id="sbox">${loadingHTML}</div>`;
+  try {
+    const d = await api('/search?q=' + encodeURIComponent(q) + '&limit=40');
+    $('#sbox').innerHTML = gridHTML(d.results);
+  } catch (e) { $('#sbox').innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
+}
+
+/* ================= 视图: 详情 ================= */
+async function vDetail(sid) {
+  renderGtabs(true);
+  const el = $('#view');
+  el.innerHTML = loadingHTML;
+  let d;
+  try { d = await api('/episodes?series_id=' + sid); }
+  catch (e) { el.innerHTML = `<div class="empty">${esc(e.message)}</div>`; return; }
+  cache.eps[sid] = d.episodes;
+  const m = d.meta;
+  const cat = catDots(m.category, 4);
+  const rec = hist.get(sid);
+  const isFav = favs.has(sid);
+  el.innerHTML = `
+    <div class="hero">
+      <img class="hposter" src="${imgx(m.cover)}" onerror="this.style.visibility='hidden'">
+      <div class="hinfo">
+        <h1>${esc(m.title)}</h1>
+        <div class="hmeta">
+          ${m.score ? `<span><b>${esc(m.score)}分</b></span><span class="sep">|</span>` : ''}
+          <span>全 ${m.episode_cnt} 集</span><span class="sep">|</span>
+          <span>${fmtW(m.play_cnt)}次播放</span>
+          ${m.followed_cnt ? `<span class="sep">|</span><span>${fmtW(m.followed_cnt)}收藏</span>` : ''}
+          ${m.status ? `<span class="sep">|</span><span>${esc(m.status)}</span>` : ''}
+        </div>
+        ${cat ? `<div class="hmeta" style="margin-top:8px">${esc(cat)}</div>` : ''}
+        <div class="hintro clamp" id="intro">${esc(m.intro || '')}
+          ${(m.intro||'').length > 90 ? `<span class="more" onclick="document.getElementById('intro').classList.toggle('clamp')">展开</span>` : ''}
+        </div>
+        <div class="hbtns">
+          ${rec ? `<button class="btn-pink" onclick="go('#/watch/${sid}/${rec.ep}')">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="#fff"><path d="M8 5.5v13c0 .8.9 1.3 1.6.9l10.2-6.5c.6-.4.6-1.4 0-1.8L9.6 4.6c-.7-.4-1.6.1-1.6.9z"/></svg>
+            继续看 第${rec.ep}集</button>` : ''}
+          <button class="btn-pink" ${rec ? 'style="background:#fff;color:#333;border:1px solid var(--line);font-weight:500"' : ''}
+                  onclick="go('#/watch/${sid}/1')">${rec ? '从头看' : '播放第1集'}</button>
+          <button class="btn-line ${isFav?'on':''}" id="favbig" onclick="toggleFavBig('${sid}')">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="${isFav?PINK:'none'}" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M6 4h12v17l-6-4.2L6 21V4z"/></svg>
+            ${isFav ? '已收藏' : '收藏'}</button>
+        </div>
+      </div>
+    </div>
+    <div class="epswrap">
+      <h3>选集（${d.episodes.length}）</h3>
+      <div class="eps">
+        ${d.episodes.map(e => {
+          const seen = rec && (e.index < rec.ep || (e.index === rec.ep && rec.pos > (rec.dur||1e9) * 0.9));
+          return `<div class="ep ${seen?'seen':''}" onclick="go('#/watch/${sid}/${e.index}')">${e.index}</div>`;
+        }).join('')}
+      </div>
+    </div>`;
+  window.toggleFavBig = s => {
+    const on = favs.toggle({ sid: s, title: m.title, cover: m.cover });
+    const b = $('#favbig');
+    b.classList.toggle('on', on);
+    b.querySelector('svg').setAttribute('fill', on ? PINK : 'none');
+    b.lastChild.textContent = on ? '已收藏' : '收藏';
+    toast(on ? '已加入收藏' : '已取消收藏');
+  };
+}
+
+/* ================= 视图: 播放 ================= */
+const W = { sid: null, eps: [], meta: null, ep: 1, auto: true, speed: 1, saveT: null };
+async function vWatch(sid, ep) {
+  renderGtabs(true);
+  const el = $('#view');
+  el.innerHTML = loadingHTML;
+  let eps = cache.eps[sid], meta = cache.meta?.[sid];
+  if (!eps) {
+    try {
+      const d = await api('/episodes?series_id=' + sid);
+      eps = d.episodes; meta = d.meta;
+      cache.eps[sid] = eps; (cache.meta = cache.meta || {})[sid] = meta;
+    }
+    catch (e) { el.innerHTML = `<div class="empty">${esc(e.message)}</div>`; return; }
+  }
+  W.title = (meta && meta.title) || ''; W.cover = (meta && meta.cover) || '';
+  W.sid = sid; W.eps = eps; W.ep = Math.min(Math.max(1, ep|0), eps.length);
+  const cur = eps[W.ep - 1] || eps[0];
+  el.innerHTML = `
+  <div class="watch">
+    <div class="stage" id="stage">
+      <video id="video" playsinline></video>
+      <div class="wtop">
+        <button class="back" onclick="go('#/detail/${sid}')">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>
+        </button>
+        <div class="wt" id="wtitle">${esc(cur.title || '第' + W.ep + '集')}</div>
+      </div>
+      <div class="vload" id="vload"><div class="spin" style="border-color:rgba(255,255,255,.3);border-top-color:${PINK}"></div>
+        <div class="tip" id="vtip">正在下载并解密 第${W.ep}集 · 首次播放约需几秒</div></div>
+      <div class="ctrl" id="ctrl">
+        <div class="pbar" id="pbar"><div class="cur" id="pcur" style="width:0%"></div><div class="dot" id="pdot" style="left:0%"></div></div>
+        <div class="crow2">
+          <button class="cbtn" id="bplay" onclick="W.play()"></button>
+          <button class="cbtn" onclick="W.step(-1)" title="上一集"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 6h2v12H7zm3.5 6l8.5-6v12z"/></svg></button>
+          <button class="cbtn" onclick="W.step(1)" title="下一集"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M15 6h2v12h-2zM5 6l8.5 6L5 18z"/></svg></button>
+          <span class="tm" id="tm">0:00 / 0:00</span>
+          <div class="cspace"></div>
+          <div style="position:relative">
+            <button class="spd" id="spd" onclick="W.speedMenu()">倍速</button>
+            <div class="speedmenu" id="smenu">
+              ${[2, 1.5, 1.25, 1, 0.75].map(s => `<div data-s="${s}" class="${s===1?'on':''}">${s}x</div>`).join('')}
+            </div>
+          </div>
+          <button class="autoc on" id="autoc" onclick="W.toggleAuto()">自动连播</button>
+        </div>
+      </div>
+    </div>
+    <div class="epdrawer" id="drawer">
+      <div class="dh">选集（${eps.length}）</div>
+      <div class="dlist">
+        ${eps.map(e => `<div class="ditem ${e.index===W.ep?'cur':''}" data-ep="${e.index}" onclick="W.load(${e.index})">
+          <span class="no">${e.index}</span><span class="dt">${esc(e.title || '')}</span></div>`).join('')}
+      </div>
+    </div>
+  </div>`;
+  W.bind();
+  W.load(W.ep, true);
+}
+
+W.bind = () => {
+  const v = $('#video');
+  W.play = () => { v.paused ? v.play() : v.pause(); };
+  W.speedMenu = () => $('#smenu').classList.toggle('show');
+  $('#smenu').addEventListener('click', e => {
+    const d = e.target.closest('[data-s]'); if (!d) return;
+    W.speed = parseFloat(d.dataset.s); v.playbackRate = W.speed;
+    $('#spd').textContent = W.speed === 1 ? '倍速' : W.speed + 'x';
+    document.querySelectorAll('#smenu div').forEach(x => x.classList.toggle('on', x === d));
+    $('#smenu').classList.remove('show');
+  });
+  W.toggleAuto = () => {
+    W.auto = !W.auto; $('#autoc').classList.toggle('on', W.auto);
+    toast(W.auto ? '自动连播已开启' : '自动连播已关闭', 1200);
+  };
+  W.step = d => { const n = W.ep + d; if (n >= 1 && n <= W.eps.length) W.load(n); };
+  W.load = (n, first) => {
+    W.ep = n; const e = W.eps[n-1];
+    $('#vload').style.display = 'flex';
+    $('#vtip').textContent = `正在下载并解密 第${n}集 · 首次播放约需几秒`;
+    $('#wtitle').textContent = (e.title && e.title.length > 40) ? e.title.slice(0, 40) + '…' : (e.title || `第${n}集`);
+    document.title = `${W.title || '红果短剧'} 第${n}集`;
+    v.src = `/stream?series_id=${W.sid}&ep=${n}`;
+    v.load();
+    document.querySelectorAll('.ditem').forEach(x => x.classList.toggle('cur', +x.dataset.ep === n));
+    document.querySelector('.ditem.cur')?.scrollIntoView({ block: 'nearest' });
+  };
+  // video events
+  v.addEventListener('play', () => $('#bplay').innerHTML = ICON_PAUSE);
+  v.addEventListener('pause', () => { $('#bplay').innerHTML = ICON_PLAY; W.save(); });
+  v.addEventListener('waiting', () => $('#vload').style.display = 'flex');
+  v.addEventListener('playing', () => { $('#vload').style.display = 'none'; W.applyResume = false; });
+  v.addEventListener('loadedmetadata', () => {
+    v.playbackRate = W.speed;
+    const rec = hist.get(W.sid);
+    if (rec && rec.ep === W.ep && rec.pos > 8 && rec.pos < v.duration - 12) {
+      v.currentTime = rec.pos; toast('已从上次位置继续播放', 1600);
+    }
+    v.play().catch(() => toast('点击画面开始播放', 1800));
+  });
+  v.addEventListener('timeupdate', () => {
+    if (!v.duration) return;
+    const p = v.currentTime / v.duration * 100;
+    $('#pcur').style.width = p + '%'; $('#pdot').style.left = p + '%';
+    $('#tm').textContent = fmtT(v.currentTime) + ' / ' + fmtT(v.duration);
+    if (!W.saveT || Date.now() - W.saveT > 3000) { W.saveT = Date.now(); W.save(); }
+  });
+  v.addEventListener('ended', () => {
+    W.save(true);
+    if (W.auto && W.ep < W.eps.length) { toast('自动播放下一集', 1200); W.load(W.ep + 1); }
+  });
+  v.addEventListener('error', () => {
+    $('#vload').style.display = 'flex';
+    $('#vtip').textContent = '本集解密或加载失败，点右侧重试或换一集';
+  });
+  // seek
+  const bar = $('#pbar');
+  const seek = ev => {
+    const r = bar.getBoundingClientRect();
+    const x = (ev.touches ? ev.touches[0].clientX : ev.clientX) - r.left;
+    if (v.duration) v.currentTime = Math.max(0, Math.min(1, x / r.width)) * v.duration;
+  };
+  bar.addEventListener('pointerdown', ev => { bar.setPointerCapture(ev.pointerId); seek(ev);
+    const mv = e2 => seek(e2), up = () => { bar.removeEventListener('pointermove', mv); bar.removeEventListener('pointerup', up); };
+    bar.addEventListener('pointermove', mv); bar.addEventListener('pointerup', up);
+  });
+  // keyboard
+  W.key = ev => {
+    if (ev.target.tagName === 'INPUT') return;
+    if (ev.code === 'Space') { ev.preventDefault(); W.play(); }
+    else if (ev.key === 'ArrowRight') v.currentTime += 5;
+    else if (ev.key === 'ArrowLeft') v.currentTime -= 5;
+  };
+  document.addEventListener('keydown', W.key);
+  // 点击画面切换播放 + 空闲隐藏控制栏
+  let hideT;
+  const stage = $('#stage');
+  stage.addEventListener('click', ev => {
+    if (ev.target === v) W.play();
+  });
+  stage.addEventListener('mousemove', () => {
+    stage.classList.remove('hidecursor');
+    clearTimeout(hideT);
+    hideT = setTimeout(() => { if (!v.paused) stage.classList.add('hidecursor'); }, 2600);
+  });
+  window.addEventListener('beforeunload', W.save);
+};
+W.save = finished => {
+  const v = $('#video'); if (!v || !W.sid) return;
+  const dur = v.duration || 0, pos = v.currentTime || 0;
+  if (!dur) return;
+  hist.put({ sid: W.sid, title: W.title || '', cover: W.cover || '',
+             ep: W.ep, epCnt: W.eps.length, pos: finished ? 0 : pos, dur });
+};
+const ICON_PLAY = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13c0 .8.9 1.3 1.6.9l10.2-6.5c.6-.4.6-1.4 0-1.8L9.6 4.6c-.7-.4-1.6.1-1.6.9z"/></svg>';
+const ICON_PAUSE = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z"/></svg>';
+
+/* ================= 视图: 收藏 ================= */
+function vFav() {
+  renderGtabs(true);
+  const a = favs.all();
+  $('#view').innerHTML = `
+    <div class="sechead"><h2>收藏</h2><div class="sub"><span class="note" style="align-self:center">${a.length} 部</span></div></div>
+    ${a.length ? gridHTML(a.map(x => ({ ...x, category: x.cat || '' }))) :
+      '<div class="empty"><div class="big">📚</div>还没有收藏，去发现页标记喜欢的剧吧</div>'}`;
+  // 修正收藏卡片封面(收藏时存的可能是代理url, 直接可用)
+}
+
+/* ================= 视图: 历史 ================= */
+function vHistory() {
+  renderGtabs(true);
+  const a = hist.all();
+  $('#view').innerHTML = `
+    <div class="sechead"><h2>观看历史</h2>
+      <div class="acts">${a.length ? '<button class="ghost" onclick="clearHist()">清空列表</button>' : ''}</div>
+    </div>
+    <div id="hbox">
+    ${a.length ? a.map(x => `
+      <div class="hrow" onclick="go('#/watch/${x.sid}/${x.ep}')">
+        <img class="hthumb" src="${imgx(x.cover)}" onerror="this.style.visibility='hidden'">
+        <div class="hinfo2">
+          <div class="t">${esc(x.title || '未知剧名')}</div>
+          <div class="m">看到 第${x.ep}集${x.epCnt ? ' / 共' + x.epCnt + '集' : ''} · ${new Date(x.ts).toLocaleString('zh-CN', {month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit'})}</div>
+          <div class="hbar"><i style="width:${Math.min(100, (x.pos||0)/(x.dur||1)*100).toFixed(1)}%"></i></div>
+        </div>
+        <div class="hacts">
+          <button class="ghost" onclick="event.stopPropagation();go('#/watch/${x.sid}/${x.ep}')">继续播放</button>
+          <button class="ghost" onclick="event.stopPropagation();delHist('${x.sid}')">删除</button>
+        </div>
+      </div>`).join('') : '<div class="empty"><div class="big">🕐</div>暂无观看记录</div>'}
+    </div>`;
+}
+function delHist(sid) { hist.remove(sid); vHistory(); toast('已删除该记录'); }
+function clearHist() {
+  if (!confirm('确定清空全部观看历史？收藏不受影响。')) return;
+  hist.clear(); vHistory(); toast('已清空观看历史');
+}
+
+/* ================= 视图: 设置 ================= */
+async function vSettings() {
+  renderGtabs(true);
+  $('#view').innerHTML = `
+    <div class="setbox"><h3>播放服务</h3>
+      <div class="kv"><span class="k">后端 API (127.0.0.1:8010)</span><span class="oktag" id="st1">检查中…</span></div>
+      <div class="kv"><span class="k">签名服务 (127.0.0.1:9099)</span><span id="st2">—</span></div>
+      <div style="margin-top:10px"><button class="ghost" onclick="vSettings()">重新检查</button></div>
+    </div>
+    <div class="setbox"><h3>关于</h3>
+      <div class="note">
+        Hongguo —— 红果短剧的非官方 macOS 桌面客户端，仅供个人学习研究。<br>
+        内容来自红果内容服务，仅供学习研究；观看进度/收藏保存在本机浏览器存储，不与手机账号同步。<br>
+        首次播放某集时后端需下载并解密，约需数秒，之后秒开；视频直链约 6 小时过期，过期自动重取。<br>
+        请勿用于商业用途或公开分发。
+      </div>
+    </div>`;
+  $('#st1').textContent = '已连接'; $('#st1').className = 'oktag';
+  try {
+    await fetch('/stats'); $('#st2').textContent = '运行中'; $('#st2').className = 'oktag';
+  } catch (e) { $('#st2').textContent = '未连接'; $('#st2').style.color = '#e0304e'; }
+}
+
+/* ================= 头部 tabs ================= */
+function renderGtabs(hide) {
+  const box = $('#gtabs');
+  if (hide) { box.innerHTML = ''; return; }
+  box.innerHTML = GENRES.map(g =>
+    `<div class="gtab ${g.id === curGenre ? 'on' : ''}" data-g="${g.id}" onclick="switchGenre('${g.id}')">${g.name}</div>`).join('');
+}
+function switchGenre(g) {
+  curGenre = g; localStorage.setItem('hg_genre', g);
+  if (location.hash.startsWith('#/discover') || location.hash === '' || location.hash === '#') route();
+  else go('#/discover');
+}
+
+/* ================= 路由 ================= */
+function route() {
+  const h = location.hash.replace(/^#\/?/, '');
+  const [view, ...rest] = h.split('/');
+  document.querySelectorAll('.nav').forEach(n => n.classList.toggle('on', n.dataset.nav === view));
+  window.scrollTo(0, 0);
+  if (view === 'detail' && rest[0]) vDetail(rest[0]);
+  else if (view === 'watch' && rest[0]) vWatch(rest[0], parseInt(rest[1] || '1', 10));
+  else if (view === 'search') vSearch(decodeURIComponent(rest.join('/') || ''));
+  else if (view === 'rank') vRank();
+  else if (view === 'fav') vFav();
+  else if (view === 'history') vHistory();
+  else if (view === 'settings') vSettings();
+  else vDiscover();
+}
+window.addEventListener('hashchange', route);
+route();
+</script>
+</body>
+</html>

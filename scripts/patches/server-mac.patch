@@ -1,0 +1,50 @@
+--- a/server.py
++++ b/server.py
+@@ -70,8 +70,14 @@
+             os.remove(ct)
+         except OSError:
+             pass
+-        if not (r and os.path.exists(out) and os.path.getsize(out) > 0):
++        # ffmpeg 缺失/失败时 offline_decrypt 回退返回 .raw.mp4(浏览器可能无法播), 以返回路径为准
++        if not (r and os.path.exists(r) and os.path.getsize(r) > 0):
+             raise HTTPException(500, "解密失败(spade 异常或 ver2 视频?)")
++        if os.path.abspath(r) != os.path.abspath(out):
++            try:
++                os.replace(r, out)      # raw 回退也纳入缓存命名, 下次命中缓存
++            except OSError:
++                return r
+         return out
+ 
+ urllib3.disable_warnings()
+@@ -119,18 +125,7 @@
+         # 管理/统计: 由各自处理器用 ADMIN_TOKEN 校验
+         pass
+     elif path not in _EXEMPT:
+-        key = request.headers.get("x-api-key") or request.query_params.get("api_key") or ""
+-        if not _keys.is_valid(key):            # 强制: 必须有效密钥
+-            _stats["auth_fail"] += 1
+-            return JSONResponse({"detail": "缺少或无效的 api_key(请在客户端配置本地链路密钥)"}, status_code=401)
+-        now = time.time()
+-        with _rl_lock:
+-            bucket = _rl.setdefault(key, [])
+-            while bucket and bucket[0] < now - 60:
+-                bucket.pop(0)
+-            if len(bucket) >= RATE_PER_MIN:
+-                return JSONResponse({"detail": f"超过限流 {RATE_PER_MIN}/分钟"}, status_code=429)
+-            bucket.append(now)
++        # 本地自用版: 去掉多用户服务的 api_key 校验与按密钥限流, 仅保留计数
+         _stats["requests"] += 1
+     resp = await call_next(request)
+     if resp.status_code >= 500:
+@@ -187,7 +182,10 @@
+ @app.get("/ui")
+ def ui():
+     from fastapi.responses import FileResponse
+-    return FileResponse(os.path.join(os.path.dirname(os.path.abspath(__file__)), "web", "index.html"))
++    base = os.path.join(os.path.dirname(os.path.abspath(__file__)), "web")
++    # 优先新版界面(app.html); 不存在时回退旧版
++    pick = "app.html" if os.path.exists(os.path.join(base, "app.html")) else "index.html"
++    return FileResponse(os.path.join(base, pick))
+ 
+ 
+ @app.get("/img")
