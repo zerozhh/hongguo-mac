@@ -30,8 +30,8 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleExecutable</key><string>Hongguo</string>
   <key>CFBundleIdentifier</key><string>local.hongguo.desktop</string>
-  <key>CFBundleName</key><string>Hongguo</string>
-  <key>CFBundleDisplayName</key><string>Hongguo</string>
+  <key>CFBundleName</key><string>红果短剧</string>
+  <key>CFBundleDisplayName</key><string>红果短剧</string>
   <key>CFBundleIconFile</key><string>AppIcon</string>
   <key>CFBundleShortVersionString</key><string>1.0.0</string>
   <key>CFBundleVersion</key><string>1</string>

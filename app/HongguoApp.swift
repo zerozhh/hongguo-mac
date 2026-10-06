@@ -217,7 +217,7 @@ struct HongguoApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var delegate
 
     var body: some Scene {
-        WindowGroup("Hongguo") {
+        WindowGroup("红果短剧") {
             ContentView()
                 .frame(minWidth: 960, minHeight: 640)
         }
