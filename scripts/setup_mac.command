@@ -79,12 +79,18 @@ say "应用 mac 适配补丁 ..."
   && say "补丁应用成功" || warn "补丁未能完全应用(上游可能已更新), 功能可能受影响"
 
 # ---------- 4. JRE 17 (Temurin, 免 Homebrew) ----------
+# Adoptium API 架构命名: aarch64/x64 (macOS uname 是 arm64/x86_64, 需映射)
+case "$ARCH" in
+  arm64)  API_ARCH="aarch64" ;;
+  x86_64) API_ARCH="x64" ;;
+  *) die "不支持的架构: $ARCH" ;;
+esac
 if [ -x "$ROOT/jre/Contents/Home/bin/java" ]; then
   say "JRE 已存在: $ROOT/jre"
 else
-  say "下载 Temurin JRE 17 ($ARCH) ..."
+  say "下载 Temurin JRE 17 ($API_ARCH) ..."
   mkdir -p "$ROOT/jre"
-  curl -fsSL "https://api.adoptium.net/v3/binary/latest/17/ga/mac/$ARCH/jre/hotspot/normal/eclipse" \
+  curl -fsSL "https://api.adoptium.net/v3/binary/latest/17/ga/mac/$API_ARCH/jre/hotspot/normal/eclipse" \
     -o "$ROOT/jre.tar.gz" || die "JRE 下载失败"
   tar xzf "$ROOT/jre.tar.gz" -C "$ROOT/jre" --strip-components=1 && rm -f "$ROOT/jre.tar.gz" \
     || die "JRE 解压失败"
