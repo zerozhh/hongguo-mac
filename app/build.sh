@@ -2,7 +2,7 @@
 # 构建 红果短剧.app (自用, ad-hoc 签名, 免开发者账号)
 # 产物: dist/Hongguo.app
 set -e
-DIR="${0:A:h}"
+DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$DIR"
 APP=dist/Hongguo.app
 
