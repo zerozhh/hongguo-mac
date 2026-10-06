@@ -11,6 +11,7 @@
 set -u
 
 UPSTREAM_REPO="zhangbaio/hongguo"
+UPSTREAM_FALLBACK="zerozhh/hongguo"   # 本人公开 fork, 作为上游备份源
 UPSTREAM_SHA="5f8a58d10f"
 ORIGIN_REPO="${HONGGUO_REPO:-zerozhh/hongguo-mac}"
 ROOT="${HONGGUO_HOME:-$HOME/hongguo-mac}"
@@ -45,13 +46,19 @@ else
   say "仓库文件: $REPO_DIR"
 fi
 
-# ---------- 2. 拉取上游后端(锁定 commit) ----------
+# ---------- 2. 拉取上游后端(锁定 commit; 多源回退) ----------
 UP="$ROOT/upstream"
 if [ -f "$UP/hongguo.py" ]; then
   say "上游后端已存在: $UP (如需重拉请删除该目录)"
 else
-  say "克隆上游后端 $UPSTREAM_REPO (约 250MB, 一次性) ..."
-  git clone --depth 1 -q "https://github.com/$UPSTREAM_REPO.git" "$UP" || die "上游克隆失败, 检查网络"
+  ok=""
+  for src in "https://github.com/$UPSTREAM_REPO.git" "https://github.com/$UPSTREAM_FALLBACK.git"; do
+    say "克隆上游后端: $src (约 250MB, 一次性) ..."
+    if git clone --depth 1 -q "$src" "$UP"; then ok=1; break; fi
+    warn "该源克隆失败, 尝试备用源 ..."
+    rm -rf "$UP"
+  done
+  [ -n "$ok" ] || die "所有上游源均克隆失败, 请检查网络后重试"
 fi
 CUR_SHA="$(git -C "$UP" rev-parse --short=10 HEAD 2>/dev/null || echo '?')"
 if [ "$CUR_SHA" != "$UPSTREAM_SHA" ]; then

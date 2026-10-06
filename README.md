@@ -116,11 +116,19 @@ cd hongguo-mac/app && bash build.sh   # 产物 app/dist/红果短剧.app(内部�
 sudo rm -rf /Applications/Hongguo.app  # 或在应用程序文件夹拖入废纸篓</code></pre>
 </details>
 
-## 🙏 致谢
+## ❤️ 核心依赖与致谢
 
-- [zhangbaio/hongguo](https://github.com/zhangbaio/hongguo) —— 后端与签名能力的公开实现，本项目的主要依赖
-- [waligoraamodio288-rgb/hongguo-desktop-releases](https://github.com/waligoraamodio288-rgb/hongguo-desktop-releases) —— Windows 版发行仓库，本项目的参照
-- [unidbg](https://github.com/zhkl0228/unidbg)、[Temurin](https://adoptium.net)、FastAPI / uvicorn / pycryptodome 等开源组件（详见 [NOTICE.md](NOTICE.md)）
+> **本项目的后端与签名能力，全部来自 [zhangbaio/hongguo](https://github.com/zhangbaio/hongguo)。**
+> 没有这个仓库，就没有这个 Mac 适配版 —— 本项目本质上是它的 **macOS 适配层**（原生壳 + 界面 + 安装体验）。
+> 去给它点个 ⭐ Star，那才是真正干活的地方。
+
+| 依赖 | 角色 | 说明 |
+|---|---|---|
+| [zhangbaio/hongguo](https://github.com/zhangbaio/hongguo) | **核心依赖**（后端 / 签名 / 解密） | 安装时拉取，锁定 commit `5f8a58d10f`；接口协议、签名方案、视频解密均为该项目的成果 |
+| [waligoraamodio288-rgb/hongguo-desktop-releases](https://github.com/waligoraamodio288-rgb/hongguo-desktop-releases) | 参照项目 | Windows 版发行仓库，本项目的界面与体验参照 |
+| [unidbg](https://github.com/zhkl0228/unidbg) / [Temurin](https://adoptium.net) / FastAPI 等 | 运行时组件 | 详见 [NOTICE.md](NOTICE.md) |
+
+**可用性保障**：为防上游仓库删除/失效，本人维护了 [公开 fork](https://github.com/zerozhh/hongguo) 作为备用源 —— 安装脚本会先尝试上游、失败自动切 fork，对你的安装过程无感。
 
 ## ⚠️ 免责声明
 

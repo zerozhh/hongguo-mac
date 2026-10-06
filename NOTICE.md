@@ -11,6 +11,10 @@
 | unidbg-sign.jar（签名服务） | 同上仓库内 `windows-package-src/sign/` | 见上游仓库声明 | 运行时加载 |
 | capture/fq_oversea/（签名资源） | 同上仓库内 | 版权归原权利方 | 运行时加载 |
 
+> **备份说明**：为保障可用性，本人维护了上游仓库的公开 fork（[zerozhh/hongguo](https://github.com/zerozhh/hongguo)，
+> GitHub 原生标注 fork 关系）与私有完整镜像（`hongguo-upstream-archive`），仅作上游失效时的备用源与存档，
+> 版权归上游作者，不构成对上游内容的重新授权。
+
 ## 安装脚本自动下载的运行时
 
 | 组件 | 来源 | 许可 |
