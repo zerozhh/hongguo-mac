@@ -1,0 +1,14 @@
+--- a/hongguo.py
++++ b/hongguo.py
+@@ -103,6 +103,11 @@
+ class Oracle:
+     """Frida 签名预言机"""
+     def __init__(self):
++        if not os.path.exists(ADB):   # mac 适配: 未配 SIGN_SERVER 时给出可读报错, 而非找不到 D:\...adb.exe
++            raise RuntimeError(
++                f"签名后端未配置: SIGN_SERVER 为空, 回退到进程内 Frida 但找不到 adb({ADB})。"
++                "请设置 SIGN_SERVER(如 http://127.0.0.1:9099)并先启动签名服务(unidbg jar),"
++                "或用 ADB/ADB_DEVICE 环境变量指向真实模拟器。")
+         pid = int(subprocess.run([ADB, "-s", DEV, "shell", "pidof", "com.phoenix.read"],
+                                  capture_output=True, text=True).stdout.split()[0])
+         dev = frida.get_device_manager().add_remote_device(FRIDA_HOST)

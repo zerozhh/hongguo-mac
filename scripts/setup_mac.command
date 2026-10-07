@@ -82,8 +82,11 @@ cp "$UP/web/index.html" "$RUN/app/web/index.html" 2>/dev/null || true
 cp "$REPO_DIR/web/app.html" "$RUN/app/web/app.html" || die "UI 复制失败"
 
 say "应用 mac 适配补丁 ..."
-( cd "$RUN/app" && patch -p1 -s < "$REPO_DIR/scripts/patches/server-mac.patch" ) \
-  && say "补丁应用成功" || warn "补丁未能完全应用(上游可能已更新), 功能可能受影响"
+say "应用 mac 适配补丁 ..."
+for p in server-mac hongguo-mac; do
+  ( cd "$RUN/app" && patch -p1 -s < "$REPO_DIR/scripts/patches/$p.patch" ) \
+    && say "$p 补丁应用成功" || warn "$p 补丁未能完全应用(上游可能已更新), 功能可能受影响"
+done
 
 # ---------- 4. JRE 17 (Temurin, 免 Homebrew) ----------
 # Adoptium API 架构命名: aarch64/x64 (macOS uname 是 arm64/x86_64, 需映射)
