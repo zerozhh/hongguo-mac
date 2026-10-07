@@ -12,3 +12,13 @@
          pid = int(subprocess.run([ADB, "-s", DEV, "shell", "pidof", "com.phoenix.read"],
                                   capture_output=True, text=True).stdout.split()[0])
          dev = frida.get_device_manager().add_remote_device(FRIDA_HOST)
+@@ -416,6 +421,9 @@
+     j = api("POST", "/novel/player/multi_video_detail/v1/", body=_episodes_body(sid))
+     data = j.get("data", {})
+     meta, eps = _parse_episode_detail(sid, data.get(sid, {}).get("video_data", {}))
++    if not (meta and meta.get("title") and eps):   # mac 适配: 偶发空壳响应不入 6h 缓存(防前端历史存下空剧名), 下次重取
++        print(f"[episodes] {sid} 空壳响应(缺title/eps), 跳过缓存", flush=True)
++        return meta, eps
+     SG.cache_set(ck, (meta, eps), ttl=21600)  # 剧集列表缓存6小时
+     return meta, eps
+ 

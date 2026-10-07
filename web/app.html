@@ -760,6 +760,7 @@ function vFav() {
 }
 
 /* ================= 视图: 历史 ================= */
+const hfix = new Set();   // 已尝试补全剧名的历史sid(防循环)
 function vHistory() {
   renderGtabs(true);
   const a = hist.all();
@@ -782,6 +783,20 @@ function vHistory() {
         </div>
       </div>`).join('') : '<div class="empty"><div class="big">🕐</div>暂无观看记录</div>'}
     </div>`;
+  // 自愈: 旧记录可能缺剧名/封面(服务端曾偶发返回空壳meta), 静默补全后重渲染
+  a.filter(x => !x.title || !x.cover).slice(0, 8).forEach(x => {
+    if (hfix.has(x.sid)) return;
+    hfix.add(x.sid);
+    api('/episodes?series_id=' + x.sid).then(d => {
+      const m = d.meta || {};
+      if (!m.title && !m.cover) return;
+      const arr = hist.all(); const i = arr.findIndex(y => y.sid === x.sid);
+      if (i < 0) return;
+      arr[i] = { ...arr[i], title: arr[i].title || m.title, cover: arr[i].cover || m.cover };
+      localStorage.setItem('hg_hist', JSON.stringify(arr));
+      if (document.querySelector('#hbox')) vHistory();
+    }).catch(() => {});
+  });
 }
 function delHist(sid) { hist.remove(sid); vHistory(); toast('已删除该记录'); }
 function clearHist() {
