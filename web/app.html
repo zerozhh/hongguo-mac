@@ -657,6 +657,15 @@ W.bind = () => {
     toast(W.auto ? '自动连播已开启' : '自动连播已关闭', 1200);
   };
   W.step = d => { const n = W.ep + d; if (n >= 1 && n <= W.eps.length) W.load(n); };
+  W.pf = 0;   // 已触发预热的集号
+  W.prefetch = () => {   // 临近结尾时让服务端提前下载+解密下一集, 切集零等待
+    const n = W.ep + 1;
+    if (!W.eps || n > W.eps.length || W.pf === n) return;
+    const remain = v.duration ? (v.duration - v.currentTime) / (v.playbackRate || 1) : 1e9;
+    if (remain > 60) return;                 // 按倍速换算成真实剩余秒数
+    W.pf = n;
+    fetch(`/prefetch?series_id=${W.sid}&ep=${n}`).catch(() => { W.pf = 0; });
+  };
   W.load = (n, first) => {
     W.ep = n; const e = W.eps[n-1];
     $('#vload').style.display = 'flex';
@@ -687,6 +696,7 @@ W.bind = () => {
     $('#pcur').style.width = p + '%'; $('#pdot').style.left = p + '%';
     $('#tm').textContent = fmtT(v.currentTime) + ' / ' + fmtT(v.duration);
     if (!W.saveT || Date.now() - W.saveT > 3000) { W.saveT = Date.now(); W.save(); }
+    W.prefetch();
   });
   v.addEventListener('ended', () => {
     W.save(true);

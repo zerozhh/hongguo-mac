@@ -1,6 +1,41 @@
 --- a/server.py
 +++ b/server.py
-@@ -70,8 +70,14 @@
+@@ -47,6 +47,26 @@
+             "encrypt": bool(enc.get("encrypt")),
+             "definition": meta.get("definition") or defn, "size": meta.get("size", 0)}
+ 
++def _trim_cache(keep=60, min_age_s=3600):
++    """流缓存超过 keep 个时, 只清理 1 小时未动的最旧文件(追剧不再无限占盘)。"""
++    try:
++        fs = [os.path.join(STREAM_CACHE, f) for f in os.listdir(STREAM_CACHE)
++              if f.endswith(".mp4") and os.path.isfile(os.path.join(STREAM_CACHE, f))]
++        excess = len(fs) - keep
++        if excess <= 0:
++            return
++        now = time.time()
++        old = sorted((f for f in fs if now - os.path.getmtime(f) > min_age_s),
++                     key=os.path.getmtime)
++        for f in old[:excess]:
++            try:
++                os.remove(f)
++            except OSError:
++                pass
++    except OSError:
++        pass
++
++
+ def _ensure_decrypted(vid, quality="best"):
+     """下载 CDN 密文 + 纯离线解密, 返回缓存的明文 mp4 路径(已缓存则直接返回)。"""
+     os.makedirs(STREAM_CACHE, exist_ok=True)
+@@ -62,6 +82,7 @@
+             raise HTTPException(404, "无直链/video_model")
+         if not t["encrypt"]:
+             H.download_file(t["url"], out)
++            _trim_cache()
+             return out
+         ct = out + ".enc"
+         H.download_file(t["url"], ct)
+@@ -70,8 +91,15 @@
              os.remove(ct)
          except OSError:
              pass
@@ -13,10 +48,11 @@
 +                os.replace(r, out)      # raw 回退也纳入缓存命名, 下次命中缓存
 +            except OSError:
 +                return r
++        _trim_cache()
          return out
  
  urllib3.disable_warnings()
-@@ -119,18 +125,7 @@
+@@ -119,18 +147,7 @@
          # 管理/统计: 由各自处理器用 ADMIN_TOKEN 校验
          pass
      elif path not in _EXEMPT:
@@ -36,7 +72,7 @@
          _stats["requests"] += 1
      resp = await call_next(request)
      if resp.status_code >= 500:
-@@ -187,7 +182,10 @@
+@@ -187,7 +204,10 @@
  @app.get("/ui")
  def ui():
      from fastapi.responses import FileResponse
@@ -48,3 +84,51 @@
  
  
  @app.get("/img")
+@@ -473,8 +493,47 @@
+         raise
+     except Exception as e:
+         raise HTTPException(500, f"stream失败: {e}")
++
++
++# ---- 下一集预热: 播放中后台提前下载+解密, 切集零等待 ----
++_prefetched = set()
++_pf_lock = threading.Lock()
+ 
+ 
++@app.get("/prefetch")
++def api_prefetch(series_id: str = None, ep: str = "1", vid: str = None, quality: str = "best"):
++    """后台预热一集: 提前 下载密文+离线解密 进 .stream_cache, 接口立即返回不阻塞。
++    用法: /prefetch?series_id=xxx&ep=N (或 vid=)。重复触发自动跳过, 失败后可重试。
++    前端在当前集临近结尾时调用, 之后 /stream 命中缓存秒开。"""
++    if not vid and not series_id:
++        raise HTTPException(400, "需 series_id+ep 或 vid")
++    key = f"v:{vid}:{quality}" if vid else f"s:{series_id}:{ep}:{quality}"
++    with _pf_lock:
++        if key in _prefetched:                              # 已在预热, 幂等
++            return {"ok": True, "queued": "running"}
++        _prefetched.add(key)
++
++    def _work():
++        try:
++            v = vid
++            if not v:                                       # series_id+ep → 解析出 vid
++                meta, eps = H.get_episodes(series_id)       # 有 6h 缓存, 近乎免费
++                idx = int(ep) if str(ep).isdigit() else 1
++                t = next((e for e in eps if (e["index"] or 0) == idx), None)
++                v = t["vid"] if t else None
++            if v:
++                t0 = time.time()
++                _ensure_decrypted(v, quality)
++                print(f"[prefetch] {v}({quality}) 就绪, 耗时 {time.time()-t0:.1f}s", flush=True)
++        except Exception as e:
++            print(f"[prefetch] {key} 失败: {e}", flush=True)
++        finally:
++            with _pf_lock:
++                _prefetched.discard(key)                    # 成功后重复请求走缓存, 失败允许重试
++    threading.Thread(target=_work, daemon=True).start()
++    return {"ok": True, "queued": True}
++
++
+ if __name__ == "__main__":
+     import uvicorn
+     # 默认只绑本机(脱机直连由同机 xinge 走 127.0.0.1 调); 需对外可设 BIND_HOST=0.0.0.0
