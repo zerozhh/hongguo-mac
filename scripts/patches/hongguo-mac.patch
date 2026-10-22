@@ -12,7 +12,107 @@
          pid = int(subprocess.run([ADB, "-s", DEV, "shell", "pidof", "com.phoenix.read"],
                                   capture_output=True, text=True).stdout.split()[0])
          dev = frida.get_device_manager().add_remote_device(FRIDA_HOST)
-@@ -416,6 +421,9 @@
+@@ -132,8 +137,10 @@
+ 
+ # 列表类接口(landpage 筛选/最新上架 + bookmall/cell 榜单)经实测红果不校验 X-Argus 签名,
+ # 游客态、并发均返回 code=0。默认对这些接口免签,把高频轮询(latest/rank/filters/browse)
+-# 从签名后端(unidbg)彻底卸载,避免其被打爆/OOM。若红果日后收紧,设 HG_SIGN_LIST=1 恢复签名。
+-SIGN_LIST = (os.environ.get("HG_SIGN_LIST") or "").strip().lower() in ("1", "true", "yes", "on")
++# 从签名后端(unidbg)彻底卸载,避免其被打爆/OOM。
++# mac 适配(2026-10-22): 红果收紧校验, landpage 免签返回 HTTP200+空body, 默认改为签名;
++# 若日后恢复免签可设 HG_SIGN_LIST=0。
++SIGN_LIST = (os.environ.get("HG_SIGN_LIST") or "1").strip().lower() in ("1", "true", "yes", "on")
+ _sign_rr = [0]
+ _sign_rr_lock = threading.Lock()
+ 
+@@ -324,6 +331,9 @@
+     }
+ 
+ 
++_search_tab_dead = False   # /search/tab 是否已确认不可用(进程级, 见 search())
++
++
+ def search(query, max_items=None):
+     """搜索短剧。原生接口按综合tab分页(next_offset+passback+search_id),
+     这里循环翻页累计短剧结果, 直到 has_more=False 或达 max_items / 翻页上限。
+@@ -338,14 +348,20 @@
+         return cached
+     results, seen = [], set()
+     offset, passback, search_id = 0, "", ""
+-    for _ in range(12):  # 安全上限: 最多翻12页
++    global _search_tab_dead              # tab 接口失败一次后本进程内不再探测(省 ~1s 节流+请求)
++    for _ in range(0 if _search_tab_dead else 12):  # 安全上限: 最多翻12页
+         q = {"query": query, "tab_name": "feed", "search_source": "1",
+              "offset": str(offset), "count": "0", "use_correct": "true"}
+         if passback:
+             q["passback"] = passback
+         if search_id:
+             q["search_id"] = search_id
+-        j = api("GET", "/reading/bookapi/search/tab/v", extra_query=q)
++        try:
++            j = api("GET", "/reading/bookapi/search/tab/v", extra_query=q, max_retries=1)
++        except (requests.RequestException, ValueError) as e:   # 接口停用/被挡(HTTP200空body)
++            print(f"[search] tab接口不可用({str(e)[:60]}), 回退 suggest", flush=True)
++            _search_tab_dead = True
++            break
+         tabs = j.get("search_tabs") or []
+         if not tabs:
+             break
+@@ -364,8 +380,53 @@
+         if not tab.get("has_more") or not data or len(results) >= max_items:
+             break
+     results = results[:max_items]
++    if not results:                       # tab 接口停用, 改用联想接口兜底
++        results = _search_suggest(query, max_items)
+     SG.cache_set(ck, results, ttl=600)  # 搜索结果缓存10分钟
+     return results
++
++
++def _search_suggest(query, max_items):
++    """搜索兜底(2026-10 起 /search/tab 对客户端返回空body)。
++    联想接口 /reading/bookapi/search/suggest/v 仍可用, query_result_v2 含
++    series_id(或 keyword=剧id)、标题、封面、热度、评分、集数, 映射为与 tab 同构的结果。"""
++    j = api("GET", "/reading/bookapi/search/suggest/v", extra_query={"query": query})
++    data = j.get("data") or {}
++    items = data.get("query_result_v2") or data.get("query_result") or []
++    out, seen = [], set()
++    for it in items:
++        if not isinstance(it, dict):
++            continue
++        vd = it.get("video_data") or {}
++        if not isinstance(vd, dict):
++            vd = {}
++        sid = str(vd.get("series_id") or "")
++        if not sid:
++            kw = str(it.get("keyword") or "")
++            if it.get("word_type") == 2 and kw.isdigit():   # word_type 2=短剧; 书是 1_<hash>
++                sid = kw
++        title = re.sub("<[^>]+>", "", (it.get("name") or vd.get("title") or "")).strip()
++        if not sid or not title or sid in seen:
++            continue
++        seen.add(sid)
++        out.append({
++            "series_id": sid,
++            "title": title,
++            "episode_cnt": vd.get("episode_cnt") or 0,
++            "score": vd.get("score") or "",
++            "play_cnt": vd.get("play_cnt") or 0,
++            "hot": "" if vd else (it.get("sug_abstract") or ""),
++            "copyright": vd.get("copyright") or "",
++            "cover": vd.get("cover") or it.get("pic_url") or "",
++            "intro": (vd.get("video_desc") or it.get("sug_abstract") or "")[:60],
++            "vid": vd.get("vid") or "",
++            "duration": vd.get("duration") or 0,
++            "horiz_cover": "",
++            "cover_tags": [],
++        })
++        if len(out) >= max_items:
++            break
++    return out
+ 
+ 
+ def _episodes_body(series_id):
+@@ -416,6 +477,9 @@
      j = api("POST", "/novel/player/multi_video_detail/v1/", body=_episodes_body(sid))
      data = j.get("data", {})
      meta, eps = _parse_episode_detail(sid, data.get(sid, {}).get("video_data", {}))
