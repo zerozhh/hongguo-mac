@@ -83,8 +83,94 @@ final class ServiceManager {
         return h
     }
 
+    /// 本机 server.py 的尺寸+修改时间, 与后端 /health 的 code_sig 对比, 判断是否同一份代码
+    private func localCodeSig() -> String? {
+        let path = kRunDir + "/app/server.py"
+        guard let a = try? FileManager.default.attributesOfItem(atPath: path) else { return nil }
+        let size = (a[.size] as? NSNumber)?.int64Value ?? -1
+        let mtime = Int64((a[.modificationDate] as? Date)?.timeIntervalSince1970 ?? -1)
+        return "\(size)-\(mtime)"
+    }
+
+    private struct Health: Decodable {
+        let service: String
+        let pid: Int32
+        let code_sig: String
+        let app_pid: Int32
+    }
+
+    private func fetchHealth() async -> Health? {
+        guard let url = URL(string: kApiBase + "/health") else { return nil }
+        var req = URLRequest(url: url)
+        req.timeoutInterval = 2
+        do {
+            let (data, resp) = try await URLSession.shared.data(for: req)
+            guard (resp as? HTTPURLResponse)?.statusCode == 200 else { return nil }
+            return try JSONDecoder().decode(Health.self, from: data)
+        } catch { return nil }
+    }
+
+    private func terminate(_ pid: Int32) async {
+        kill(pid, SIGTERM)
+        for _ in 0..<10 { if !portOpen(8010) { return }; try? await Task.sleep(nanoseconds: 300_000_000) }
+        kill(pid, SIGKILL)
+        for _ in 0..<10 { if !portOpen(8010) { return }; try? await Task.sleep(nanoseconds: 200_000_000) }
+    }
+
+    /// 处理 8010 上的既有服务: adopt=复用, spawn=需要自己拉起, fail=端口被他人占用/关不掉。
+    private enum PyPrep: Equatable { case adopt, spawn, fail }
+
+    private func preparePython() async -> PyPrep {
+        guard portOpen(8010) else { return .spawn }
+        guard let h = await fetchHealth(), h.service == "红果短剧API" else {
+            appState.errorText = "端口 8010 被其他程序占用，无法启动后端"
+            return .fail
+        }
+        let mine = Int32(ProcessInfo.processInfo.processIdentifier)
+        if h.code_sig == localCodeSig() && (h.app_pid == 0 || h.app_pid == mine) {
+            return .adopt                             // 同一份代码, 且属于当前 App 或外部启动
+        }
+        appState.statusText = "检测到旧后端，正在重启…"
+        await terminate(h.pid)                        // 旧 python 退出时会顺带收掉它的签名服务
+        return portOpen(8010) ? .fail : .spawn
+    }
+
+    private func spawnPython(signPid: Int32) -> Bool {
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: kRunDir + "/venv/bin/python")
+        p.arguments = ["server.py"]
+        p.currentDirectoryURL = URL(fileURLWithPath: kRunDir + "/app")
+        p.environment = [
+            "SIGN_SERVER": "http://127.0.0.1:9099",
+            "PORT": "8010",
+            "HONGGUO_APP_PID": String(ProcessInfo.processInfo.processIdentifier),
+            "HONGGUO_SIGN_PID": String(signPid),
+            "HOME": kHome,
+            "PATH": "/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin",
+            "LANG": "zh_CN.UTF-8",
+        ]
+        if let log = appendLogHandle("/tmp/hongguo-api.log") {
+            p.standardOutput = log
+            p.standardError = log
+        }
+        do { try p.run(); pyProc = p } catch {
+            appState.errorText = "后端服务启动失败: \(error.localizedDescription)"
+            return false
+        }
+        return true
+    }
+
     /// 启动全部服务并等 API 就绪(最长 ~40s)。已运行的端口直接复用。
     func startAll() async -> Bool {
+        let hadPython = portOpen(8010)
+        let prep = await preparePython()
+        guard prep != .fail else {
+            if appState.errorText.isEmpty { appState.errorText = "旧后端无法关闭，请手动结束占用 8010 的进程" }
+            return false
+        }
+        if hadPython && prep == .spawn {
+            try? await Task.sleep(nanoseconds: 1_000_000_000)   // 等旧 python 收掉它拉起的签名服务
+        }
         if !portOpen(9099) {
             let p = Process()
             p.executableURL = URL(fileURLWithPath: kJavaBin)
@@ -100,27 +186,7 @@ final class ServiceManager {
                 return false
             }
         }
-        if !portOpen(8010) {
-            let p = Process()
-            p.executableURL = URL(fileURLWithPath: kRunDir + "/venv/bin/python")
-            p.arguments = ["server.py"]
-            p.currentDirectoryURL = URL(fileURLWithPath: kRunDir + "/app")
-            p.environment = [
-                "SIGN_SERVER": "http://127.0.0.1:9099",
-                "PORT": "8010",
-                "HOME": kHome,
-                "PATH": "/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin",
-                "LANG": "zh_CN.UTF-8",
-            ]
-            if let log = appendLogHandle("/tmp/hongguo-api.log") {
-                p.standardOutput = log
-                p.standardError = log
-            }
-            do { try p.run(); pyProc = p } catch {
-                appState.errorText = "后端服务启动失败: \(error.localizedDescription)"
-                return false
-            }
-        }
+        if prep == .spawn, !spawnPython(signPid: javaProc?.processIdentifier ?? 0) { return false }
         for i in 0..<80 {
             if await apiHealthy() { return true }
             if let p = pyProc, !p.isRunning { break }

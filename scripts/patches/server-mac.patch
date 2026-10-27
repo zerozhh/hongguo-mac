@@ -1,6 +1,77 @@
 --- a/server.py
 +++ b/server.py
-@@ -47,6 +47,26 @@
+@@ -15,7 +15,7 @@
+   GET /stream?series_id=xxx&ep=1          ★服务端【纯离线解密】后串流, 客户端拿到可播mp4
+   GET /stream?vid=xxx&quality=1080p       也可直接按 vid + 清晰度; 支持 Range 拖动; <video>用?api_key=
+ """
+-import re, os, io, time, threading, sys
++import re, os, io, time, threading, sys, signal, subprocess, atexit
+ from fastapi import FastAPI, HTTPException, Query, Depends, Request, Body
+ from fastapi.responses import StreamingResponse, JSONResponse, Response, FileResponse
+ import requests, urllib3
+@@ -27,6 +27,61 @@
+ import offline_dl as ODL
+ 
+ STREAM_CACHE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "downloads", ".stream_cache")
++
++# 代码签名: 供 App 启动时校验「端口上跑的是不是当前这份代码」, 防止静默采用旧进程
++def _code_sig():
++    try:
++        st = os.stat(os.path.abspath(__file__))
++        return f"{st.st_size}-{int(st.st_mtime)}"
++    except OSError:
++        return "?"
++CODE_SIG = _code_sig()
++
++# 父进程监控: App 通过 HONGGUO_APP_PID 托付自身 pid; App 崩溃/强退时
++# applicationWillTerminate 不会执行, 由子进程发现被 launchd 收养(ppid 变化)后自行退出。
++_APP_PID = os.environ.get("HONGGUO_APP_PID", "").strip()
++_SIGN_PID = os.environ.get("HONGGUO_SIGN_PID", "").strip()   # App 拉起的签名服务 pid(外部启动时为 0)
++
++def _kill_owned_sign():
++    """只清理由本 App 拉起、且确实是 unidbg-sign.jar 的进程, 防 pid 复用误杀。"""
++    if not _SIGN_PID.isdigit() or int(_SIGN_PID) <= 0:
++        return
++    pid = int(_SIGN_PID)
++    try:
++        cmd = subprocess.run(["ps", "-p", str(pid), "-o", "command="],
++                             capture_output=True, text=True, timeout=3).stdout
++    except Exception:
++        return
++    if "unidbg-sign.jar" not in cmd:
++        return
++    try:
++        os.kill(pid, signal.SIGTERM)
++    except ProcessLookupError:
++        return
++    for _ in range(10):
++        time.sleep(0.2)
++        try:
++            os.kill(pid, 0)
++        except ProcessLookupError:
++            return
++    try:
++        os.kill(pid, signal.SIGKILL)
++    except OSError:
++        pass
++
++atexit.register(_kill_owned_sign)   # 正常退出(SIGTERM/uvicorn 收尾)时也清理
++
++def _watch_parent():
++    if not _APP_PID.isdigit():
++        return                              # 外部 start_all.sh/nohup 启动: 不启用, 行为不变
++    pid = int(_APP_PID)
++    while True:
++        time.sleep(2)
++        if os.getppid() != pid:              # 父进程消失 → 已被 launchd 收养
++            print("[server] 父进程(App)已退出, 服务自动关闭", flush=True)
++            _kill_owned_sign()
++            os._exit(0)
++
+ _dec_locks = {}; _dec_guard = threading.Lock()
+ def _dec_lock(key):
+     with _dec_guard:
+@@ -47,6 +102,26 @@
              "encrypt": bool(enc.get("encrypt")),
              "definition": meta.get("definition") or defn, "size": meta.get("size", 0)}
  
@@ -27,7 +98,7 @@
  def _ensure_decrypted(vid, quality="best"):
      """下载 CDN 密文 + 纯离线解密, 返回缓存的明文 mp4 路径(已缓存则直接返回)。"""
      os.makedirs(STREAM_CACHE, exist_ok=True)
-@@ -62,6 +82,7 @@
+@@ -62,6 +137,7 @@
              raise HTTPException(404, "无直链/video_model")
          if not t["encrypt"]:
              H.download_file(t["url"], out)
@@ -35,7 +106,7 @@
              return out
          ct = out + ".enc"
          H.download_file(t["url"], ct)
-@@ -70,8 +91,15 @@
+@@ -70,8 +146,15 @@
              os.remove(ct)
          except OSError:
              pass
@@ -52,7 +123,16 @@
          return out
  
  urllib3.disable_warnings()
-@@ -119,18 +147,7 @@
+@@ -103,7 +186,7 @@
+ _rl_lock = threading.Lock()
+ 
+ # 免鉴权路径: 首页/网页/封面图/文档/管理页(管理页自己用 ADMIN_TOKEN 校验)
+-_EXEMPT = ("/", "/ui", "/img", "/docs", "/openapi.json", "/redoc", "/favicon.ico")
++_EXEMPT = ("/", "/ui", "/img", "/docs", "/openapi.json", "/redoc", "/favicon.ico", "/health")
+ _ADMIN_PREFIX = "/admin"
+ 
+ 
+@@ -119,18 +202,7 @@
          # 管理/统计: 由各自处理器用 ADMIN_TOKEN 校验
          pass
      elif path not in _EXEMPT:
@@ -72,7 +152,21 @@
          _stats["requests"] += 1
      resp = await call_next(request)
      if resp.status_code >= 500:
-@@ -187,7 +204,10 @@
+@@ -162,6 +234,13 @@
+         "/episodes?series_id=", "/play?series_id=&ep=1-10",
+         "/download?series_id=&ep=1-10", "/download/status?task_id=",
+         "/stream?series_id=&ep=1 (解密可播)", "/stream?vid=&quality=1080p", "/stats"]}
++
++
++@app.get("/health")
++def health():
++    """供 Mac App 启动时做身份 + 代码版本 + 归属校验; 不含敏感信息。"""
++    return {"service": "红果短剧API", "pid": os.getpid(), "code_sig": CODE_SIG,
++            "app_pid": int(_APP_PID) if _APP_PID.isdigit() else 0}
+ 
+ 
+ @app.get("/stats")
+@@ -187,7 +266,10 @@
  @app.get("/ui")
  def ui():
      from fastapi.responses import FileResponse
@@ -84,7 +178,7 @@
  
  
  @app.get("/img")
-@@ -473,8 +493,47 @@
+@@ -473,9 +555,49 @@
          raise
      except Exception as e:
          raise HTTPException(500, f"stream失败: {e}")
@@ -131,4 +225,6 @@
 +
  if __name__ == "__main__":
      import uvicorn
++    threading.Thread(target=_watch_parent, daemon=True).start()
      # 默认只绑本机(脱机直连由同机 xinge 走 127.0.0.1 调); 需对外可设 BIND_HOST=0.0.0.0
+     uvicorn.run(app, host=os.environ.get("BIND_HOST", "127.0.0.1"), port=int(os.environ.get("PORT", "8000")))
